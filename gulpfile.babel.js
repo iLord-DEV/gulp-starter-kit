@@ -27,33 +27,49 @@ import RevDelete from 'gulp-rev-delete-original'
 const PRODUCTION = !!(process.env.NODE_ENV === 'production')
 
 // Load settings from config.yml file
-function loadConfig () {
+function loadConfig() {
   const configFile = fs.readFileSync('config.yml')
   return yaml.load(configFile)
 }
-const { PATHS, PORT, PURGECSS } = loadConfig()
+const {
+  PATHS,
+  PORT,
+  PURGECSS
+} = loadConfig()
 
 // Compile SCSS into CSS
 // In production CSS is prefixed and compressed
-function css () {
+function css() {
   return gulp.src('src/assets/scss/app.scss')
     .pipe(sourcemaps.init())
-    .pipe(sass({ includePaths: PATHS.sassLibs }).on('error', sass.logError))
+    .pipe(sass({
+      includePaths: PATHS.sassLibs
+    }).on('error', sass.logError))
     .pipe(gulpif(PRODUCTION, postcss([autoprefixer(), cssnano()])))
     .pipe(gulpif(!PRODUCTION, sourcemaps.write('.')))
-    .pipe(gulp.src(PATHS.additionalCssFiles2Copy, { since: gulp.lastRun(css) }))
+    .pipe(gulp.src(PATHS.additionalCssFiles2Copy, {
+      since: gulp.lastRun(css)
+    }))
     .pipe(gulp.dest(`${PATHS.dist}/assets/css`))
+    .pipe(browserSync.reload({
+      stream: true
+    }))
 }
 
 // Stylelint for CSS & SCSS
-function stylelint (done) {
+function stylelint(done) {
   return gulp.src('src/**/*.{css,scss}')
-    .pipe(gulpStylelint({ reporters: [{ formatter: 'string', console: true }] })
+    .pipe(gulpStylelint({
+        reporters: [{
+          formatter: 'string',
+          console: true
+        }]
+      })
       .on('error', done))
 }
 
 // Remove unused CSS
-function cleanUnusedCSS () {
+function cleanUnusedCSS() {
   return gulp.src(`${PATHS.dist}/**/*.css`)
     .pipe(purgecss({
       content: [`${PATHS.dist}/**/*.{html,js}`],
@@ -65,22 +81,27 @@ function cleanUnusedCSS () {
 }
 
 // Compress assets
-function compressAssets () {
+function compressAssets() {
   return gulp.src(`${PATHS.dist}/**/*.{css,js,html}`)
-    .pipe(gzip({ extension: 'gzip' }))
+    .pipe(gzip({
+      extension: 'gzip'
+    }))
     .pipe(gulp.dest(PATHS.dist))
 }
 
 // Revisioning files
-function revFiles () {
+function revFiles() {
   return gulp.src(`${PATHS.dist}/**/*.{css,html,js}`)
-    .pipe(RevAll.revision({ dontRenameFile: ['.html'], dontUpdateReference: ['.html'] }))
+    .pipe(RevAll.revision({
+      dontRenameFile: ['.html'],
+      dontUpdateReference: ['.html']
+    }))
     .pipe(RevDelete())
     .pipe(gulp.dest(PATHS.dist))
 }
 
 // Eslint for JS
-function eslint (done) {
+function eslint(done) {
   return gulp.src('src/**/*.js')
     .pipe(gulpEslint())
     .pipe(gulpEslint.format('stylish'))
@@ -89,62 +110,87 @@ function eslint (done) {
 
 // Compile JS and transform with Babel
 // In production JS is compressed
-function js () {
-  const bundler = browserify('src/assets/js/app.js', { debug: true }).transform(babel)
+function js() {
+  const bundler = browserify('src/assets/js/app.js', {
+    debug: true
+  }).transform(babel)
   return bundler.bundle()
-    .on('error', function (err) { console.error(err.message); this.emit('end') })
+    .on('error', function (err) {
+      console.error(err.message);
+      this.emit('end')
+    })
     .pipe(source('app.js'))
     .pipe(buffer())
-    .pipe(sourcemaps.init({ loadMaps: true }))
+    .pipe(sourcemaps.init({
+      loadMaps: true
+    }))
     .pipe(gulpif(!PRODUCTION, sourcemaps.write('.')))
     .pipe(gulpif(PRODUCTION, uglify()))
-    .pipe(gulp.src(PATHS.additionalJsFiles2Copy, { since: gulp.lastRun(js) }))
+    .pipe(gulp.src(PATHS.additionalJsFiles2Copy, {
+      since: gulp.lastRun(js)
+    }))
     .pipe(gulp.dest(`${PATHS.dist}/assets/js`))
 }
 
 // Copy files from the "src/assets" folder
 // but skips the "img", "js", and "scss" folder
-function copyAssets () {
-  return gulp.src(PATHS.assets, { nodir: true })
+function copyAssets() {
+  return gulp.src(PATHS.assets, {
+      nodir: true
+    })
     .pipe(gulp.dest(`${PATHS.dist}/assets`))
 }
 
 // Copy static files to "dist" folder
-function copyStaticFiles () {
-  return gulp.src(PATHS.staticFiles, { allowEmpty: true })
+function copyStaticFiles() {
+  return gulp.src(PATHS.staticFiles, {
+      allowEmpty: true
+    })
     .pipe(gulp.dest(PATHS.dist))
 }
 
 // Copy images
 // In production images are compressed
-function images () {
+function images() {
   return gulp.src(PATHS.images)
     .pipe(gulpif(PRODUCTION,
       imagemin([
-        imageminMozjpeg({ quality: 80 }),
-        imageminPngquant({ quality: [0.5, 0.8] }),
-        imagemin.svgo({ plugins: [{ removeViewBox: true }, { cleanupIDs: false }] })
+        imageminMozjpeg({
+          quality: 80
+        }),
+        imageminPngquant({
+          quality: [0.5, 0.8]
+        }),
+        imagemin.svgo({
+          plugins: [{
+            removeViewBox: true
+          }, {
+            cleanupIDs: false
+          }]
+        })
       ])))
     .pipe(gulp.dest(`${PATHS.dist}/assets`))
 }
 
 // Start a server with Browsersync
-function server (done) {
+function server(done) {
   browserSync.init({
-    server: PATHS.dist, port: PORT, open: false
+    server: PATHS.dist,
+    port: PORT,
+    open: false
   }, done)
 }
 // Reload the browser with Browsersync
-function liveReload (done) {
+function liveReload(done) {
   browserSync.reload()
   done()
 }
 
 // Watch for file changes and run tasks
-function watchFiles (done) {
+function watchFiles(done) {
   gulp.watch(PATHS.assets, copyAssets)
   gulp.watch(PATHS.staticFiles, copyStaticFiles)
-  gulp.watch('src/assets/scss/**/*.{css,scss}', gulp.series(css, liveReload))
+  gulp.watch('src/assets/scss/**/*.{css,scss}', gulp.series(css))
   gulp.watch('src/assets/js/**/*.js', gulp.series(js, liveReload))
   gulp.watch('src/assets/img/**/*', gulp.series(images, liveReload))
   gulp.watch(['src/**/*.{html,md,njk}', 'src/**/*.json'], liveReload)
